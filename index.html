@@ -20,7 +20,11 @@
   .toggle { grid-row:span 2; border:none; border-radius:999px; padding:10px 16px; font-size:14px; cursor:pointer;
             background:#2e7d4f; color:#fff; min-width:96px; }
   .card.used .toggle { background:#999; }
-  .memo { grid-column:1 / -1; border:1px solid #ddd; border-radius:8px; padding:6px 8px; font-size:14px; }
+  .memo, .url { grid-column:1 / -1; border:1px solid #ddd; border-radius:8px; padding:6px 8px; font-size:14px; min-width:0; }
+  .links { grid-column:1 / -1; display:flex; gap:8px; }
+  .links button, .links a { flex:1; text-align:center; text-decoration:none; border:1px solid #b5482e; color:#b5482e;
+            background:#fff; border-radius:8px; padding:8px; font-size:14px; cursor:pointer; }
+  .links .disabled { opacity:.4; pointer-events:none; }
   .status { text-align:center; font-size:12px; color:#888; min-height:1em; }
 </style>
 </head>
@@ -69,13 +73,31 @@ function render() {
       <div class="name"></div>
       <button class="toggle">${v.used ? '使用済み' : '未使用'}</button>
       <div class="date">${v.used && v.date ? v.date + ' に使用' : ''}</div>
-      <input class="memo" placeholder="メモ（使った人・店舗など）">`;
+      <input class="url" type="url" placeholder="優待のURLを貼り付け">
+      <div class="links">
+        <button class="copy">URLをコピー</button>
+        <a class="open" target="_blank" rel="noopener">開く ↗</a>
+      </div>
+      <input class="memo" placeholder="メモ（渡した人・店舗など）">`;
     el.querySelector('.name').textContent = name;
     const memo = el.querySelector('.memo');
+    const url = el.querySelector('.url');
+    const copy = el.querySelector('.copy');
+    const open = el.querySelector('.open');
     memo.value = v.memo || '';
+    url.value = v.url || '';
+    if (v.url) { open.href = v.url; } else { copy.classList.add('disabled'); open.classList.add('disabled'); }
+
     el.querySelector('.toggle').onclick = () =>
-      save(i, { used: !v.used, date: !v.used ? today() : '', memo: memo.value });
+      save(i, { ...v, used: !v.used, date: !v.used ? today() : '', memo: memo.value, url: url.value.trim() });
     memo.onchange = () => save(i, { ...v, memo: memo.value });
+    url.onchange = () => save(i, { ...v, url: url.value.trim() });
+    copy.onclick = async () => {
+      try { await navigator.clipboard.writeText(v.url); }
+      catch (e) { url.select(); document.execCommand('copy'); } // 古いブラウザ用
+      copy.textContent = 'コピーしました ✓';
+      setTimeout(() => copy.textContent = 'URLをコピー', 1500);
+    };
     $('list').appendChild(el);
   });
   $('left').textContent = left;
