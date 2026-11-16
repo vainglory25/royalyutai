@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ロイヤル家族優待 管理</title>
+<style>
+  body { font-family: system-ui, sans-serif; background:#f5f3ef; margin:0; padding:16px; color:#222; }
+  .wrap { max-width:480px; margin:0 auto; }
+  header { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+  header button { font-size:20px; background:none; border:none; padding:8px 14px; cursor:pointer; }
+  h1 { font-size:20px; margin:0; }
+  .summary { text-align:center; margin-bottom:16px; font-size:15px; }
+  .summary b { font-size:22px; color:#b5482e; }
+  .card { background:#fff; border-radius:12px; padding:12px 14px; margin-bottom:10px;
+          box-shadow:0 1px 3px rgba(0,0,0,.08); display:grid; grid-template-columns:1fr auto; gap:6px 10px; align-items:center; }
+  .card.used { background:#e9e7e3; color:#888; }
+  .name { font-weight:bold; }
+  .date { font-size:12px; color:#888; }
+  .toggle { grid-row:span 2; border:none; border-radius:999px; padding:10px 16px; font-size:14px; cursor:pointer;
+            background:#2e7d4f; color:#fff; min-width:96px; }
+  .card.used .toggle { background:#999; }
+  .memo { grid-column:1 / -1; border:1px solid #ddd; border-radius:8px; padding:6px 8px; font-size:14px; }
+  .status { text-align:center; font-size:12px; color:#888; min-height:1em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <button id="prev">◀</button>
+    <h1 id="title"></h1>
+    <button id="next">▶</button>
+  </header>
+  <div class="summary">残り <b id="left">-</b> / 6 枚</div>
+  <div id="list"></div>
+  <div class="status" id="status"></div>
+</div>
+
+<script>
+// ★ 優待の名前はここで自由に変更できます
+const ITEMS = ['優待 1', '優待 2', '優待 3', '優待 4', '優待 5', '優待 6'];
+
+let cur = new Date(); cur.setDate(1);
+let data = {};
+const $ = id => document.getElementById(id);
+const monthKey = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+const today = () => new Date().toLocaleDateString('ja-JP');
+
+async function load() {
+  $('title').textContent = `${cur.getFullYear()}年${cur.getMonth() + 1}月`;
+  $('status').textContent = '読み込み中…';
+  try {
+    const r = await fetch(`/api/yutai?month=${monthKey(cur)}`);
+    data = await r.json();
+    $('status').textContent = '';
+  } catch (e) { data = {}; $('status').textContent = '読み込み失敗'; }
+  render();
+}
+
+function render() {
+  $('list').innerHTML = '';
+  let left = 0;
+  ITEMS.forEach((name, i) => {
+    const v = data[i] || { used: false, date: '', memo: '' };
+    if (!v.used) left++;
+    const el = document.createElement('div');
+    el.className = 'card' + (v.used ? ' used' : '');
+    el.innerHTML = `
+      <div class="name"></div>
+      <button class="toggle">${v.used ? '使用済み' : '未使用'}</button>
+      <div class="date">${v.used && v.date ? v.date + ' に使用' : ''}</div>
+      <input class="memo" placeholder="メモ（使った人・店舗など）">`;
+    el.querySelector('.name').textContent = name;
+    const memo = el.querySelector('.memo');
+    memo.value = v.memo || '';
+    el.querySelector('.toggle').onclick = () =>
+      save(i, { used: !v.used, date: !v.used ? today() : '', memo: memo.value });
+    memo.onchange = () => save(i, { ...v, memo: memo.value });
+    $('list').appendChild(el);
+  });
+  $('left').textContent = left;
+}
+
+async function save(i, v) {
+  data[i] = v; render();
+  $('status').textContent = '保存中…';
+  try {
+    const r = await fetch(`/api/yutai?month=${monthKey(cur)}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ i, ...v })
+    });
+    if (!r.ok) throw 0;
+    $('status').textContent = '保存しました';
+  } catch (e) { $('status').textContent = '保存に失敗しました'; }
+}
+
+$('prev').onclick = () => { cur.setMonth(cur.getMonth() - 1); load(); };
+$('next').onclick = () => { cur.setMonth(cur.getMonth() + 1); load(); };
+load();
+</script>
+</body>
+</html>
