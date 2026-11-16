@@ -30,7 +30,9 @@ module.exports = async (req, res) => {
       const b = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
       const i = Number(b.i);
       if (!(i >= 0 && i < 6)) return res.status(400).json({ error: 'i は 0〜5' });
-      const val = { used: !!b.used, date: b.date || '', memo: String(b.memo || '').slice(0, 100) };
+      const url = String(b.url || '').trim().slice(0, 1000);
+      if (url && !/^https?:\/\//.test(url)) return res.status(400).json({ error: 'URL は http(s):// で始めてください' });
+      const val = { used: !!b.used, date: b.date || '', memo: String(b.memo || '').slice(0, 100), url };
       await redis(['HSET', key, String(i), JSON.stringify(val)]);
       return res.status(200).json({ ok: true });
     }
