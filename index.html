@@ -27,6 +27,14 @@
   .links .disabled { opacity:.4; pointer-events:none; }
   .status { text-align:center; font-size:12px; color:#888; min-height:1em; }
   .hidden { display:none !important; }
+  .rules { background:#fff8e6; border:1px solid #f0d58c; border-radius:12px; padding:12px 14px; margin-bottom:12px; font-size:13px; line-height:1.7; }
+  .rules b { color:#8a5a00; font-size:14px; }
+  .rules ul { margin:4px 0 0; padding-left:1.2em; }
+  .notes { background:#fff; border-radius:12px; padding:12px 14px; margin-bottom:16px; box-shadow:0 1px 3px rgba(0,0,0,.08); }
+  .notes label { font-weight:bold; font-size:14px; display:block; margin-bottom:6px; }
+  .notes textarea { width:100%; box-sizing:border-box; min-height:70px; border:1px solid #ddd; border-radius:8px;
+                    padding:8px; font-size:14px; font-family:inherit; resize:vertical; }
+  .notes .saved { font-size:12px; color:#888; min-height:1em; text-align:right; }
   .del { grid-column:1 / -1; justify-self:end; background:none; border:none; color:#c0392b; font-size:13px; cursor:pointer; padding:0; }
   #add { display:block; width:100%; border:2px dashed #b5482e; background:none; color:#b5482e; border-radius:12px;
          padding:12px; font-size:15px; cursor:pointer; margin-bottom:10px; }
@@ -55,6 +63,22 @@
     <h1 id="title"></h1>
     <button id="next">▶</button>
   </header>
+  <div class="rules">
+    <b>ご利用にあたってのお願い</b>
+    <ul>
+      <li>この優待は、招待した限られた方だけでご利用いただいています。</li>
+      <li>乱用を防ぐため、第三者への譲渡は原則禁止です。</li>
+      <li>やむを得ず譲渡する場合は、このサイトを教えるのではなく、<b>「URLをコピー」</b>で券のURLだけを渡してください。</li>
+      <li>皆さまのマナーで成り立っています。ご協力よろしくお願いします。</li>
+    </ul>
+  </div>
+
+  <div class="notes">
+    <label for="notes">共有事項</label>
+    <textarea id="notes" placeholder="みんなへの連絡など、自由に書けます"></textarea>
+    <div class="saved" id="notesStatus"></div>
+  </div>
+
   <div class="summary">残り <b id="left">-</b> / <span id="total">-</span> 枚
     <a href="help.html" style="margin-left:12px;font-size:13px;color:#b5482e;">使い方 ›</a></div>
   <div id="list"></div>
@@ -134,6 +158,26 @@ function render() {
   $('total').textContent = total;
 }
 
+// ---------- 共有事項 ----------
+async function loadNotes() {
+  try {
+    const r = await fetch('/api/notes');
+    if (r.ok) $('notes').value = (await r.json()).text;
+  } catch (e) {}
+}
+$('notes').onchange = async () => {
+  $('notesStatus').textContent = '保存中…';
+  try {
+    const r = await fetch('/api/notes', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: $('notes').value })
+    });
+    if (r.status === 401) return showLogin();
+    if (!r.ok) throw 0;
+    $('notesStatus').textContent = '保存しました';
+  } catch (e) { $('notesStatus').textContent = '保存に失敗しました'; }
+};
+
 // 券を追加：今ある番号の次の番号で空の券を保存
 $('add').onclick = () => {
   const max = Math.max(ITEMS.length - 1, ...Object.keys(data).map(Number));
@@ -179,6 +223,7 @@ function showLogin() {
 function showApp() {
   $('login').classList.add('hidden');
   $('app').classList.remove('hidden');
+  loadNotes();
   load();
 }
 
