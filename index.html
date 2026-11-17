@@ -52,7 +52,8 @@
     <h1 id="title"></h1>
     <button id="next">▶</button>
   </header>
-  <div class="summary">残り <b id="left">-</b> / 6 枚</div>
+  <div class="summary">残り <b id="left">-</b> / 6 枚
+    <a href="help.html" style="margin-left:12px;font-size:13px;color:#b5482e;">使い方 ›</a></div>
   <div id="list"></div>
   <div class="status" id="status"></div>
   <button id="logout">ログアウト</button>
@@ -97,7 +98,7 @@ function render() {
         <button class="copy">URLをコピー</button>
         <a class="open" target="_blank" rel="noopener">開く ↗</a>
       </div>
-      <input class="memo" placeholder="メモ（渡した人・店舗など）">`;
+      <input class="memo" placeholder="メモ">`;
     el.querySelector('.name').textContent = name;
     const memo = el.querySelector('.memo');
     const url = el.querySelector('.url');
