@@ -11,7 +11,16 @@ module.exports = async (req, res) => {
   const totpOn = !!process.env.TOTP_SECRET;
 
   if (req.method === 'GET') {
-    return res.status(200).json({ loggedIn: A.isLoggedIn(req), totp: totpOn });
+    // check=設定チェック用（値そのものは返さず、入っているかどうかだけ）
+    return res.status(200).json({
+      loggedIn: A.isLoggedIn(req), totp: totpOn,
+      check: {
+        APP_PASSWORD: !!process.env.APP_PASSWORD,
+        SESSION_SECRET: !!process.env.SESSION_SECRET,
+        TOTP_SECRET: totpOn,
+        UPSTASH: !!(process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL),
+      },
+    });
   }
   if (req.method === 'DELETE') {
     A.clearSessionCookie(res);
@@ -33,7 +42,8 @@ module.exports = async (req, res) => {
     }
 
     const b = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
-    const passOk = A.safeEq(b.password || '', process.env.APP_PASSWORD);
+    // 前後の空白は無視（環境変数にコピペしたときの空白・改行対策）
+    const passOk = A.safeEq(String(b.password || '').trim(), process.env.APP_PASSWORD.trim());
     const codeOk = !totpOn || A.verifyTotp(process.env.TOTP_SECRET, b.code);
 
     if (!(passOk && codeOk)) {
