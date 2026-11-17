@@ -26,10 +26,27 @@
             background:#fff; border-radius:8px; padding:8px; font-size:14px; cursor:pointer; }
   .links .disabled { opacity:.4; pointer-events:none; }
   .status { text-align:center; font-size:12px; color:#888; min-height:1em; }
+  .hidden { display:none !important; }
+  #login { background:#fff; border-radius:12px; padding:24px 20px; margin-top:40px; box-shadow:0 1px 3px rgba(0,0,0,.08);
+           display:flex; flex-direction:column; gap:12px; }
+  #login h2 { margin:0 0 4px; font-size:18px; text-align:center; }
+  #login input { border:1px solid #ccc; border-radius:8px; padding:10px; font-size:16px; }
+  #login button { border:none; border-radius:8px; padding:12px; font-size:16px; background:#b5482e; color:#fff; cursor:pointer; }
+  #loginErr { color:#c0392b; font-size:13px; text-align:center; min-height:1em; }
+  #logout { display:block; margin:16px auto 0; background:none; border:none; color:#888; font-size:13px; text-decoration:underline; cursor:pointer; }
 </style>
 </head>
 <body>
-<div class="wrap">
+<form id="login" class="wrap hidden">
+  <h2>ロイヤル家族優待</h2>
+  <input id="pw" type="password" placeholder="パスワード" autocomplete="current-password" required>
+  <input id="code" class="hidden" inputmode="numeric" pattern="[0-9]*" maxlength="6"
+         placeholder="認証アプリの6桁コード" autocomplete="one-time-code">
+  <button type="submit">ログイン</button>
+  <div id="loginErr"></div>
+</form>
+
+<div class="wrap hidden" id="app">
   <header>
     <button id="prev">◀</button>
     <h1 id="title"></h1>
@@ -38,6 +55,7 @@
   <div class="summary">残り <b id="left">-</b> / 6 枚</div>
   <div id="list"></div>
   <div class="status" id="status"></div>
+  <button id="logout">ログアウト</button>
 </div>
 
 <script>
@@ -55,6 +73,7 @@ async function load() {
   $('status').textContent = '読み込み中…';
   try {
     const r = await fetch(`/api/yutai?month=${monthKey(cur)}`);
+    if (r.status === 401) return showLogin();
     data = await r.json();
     $('status').textContent = '';
   } catch (e) { data = {}; $('status').textContent = '読み込み失敗'; }
@@ -111,14 +130,56 @@ async function save(i, v) {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ i, ...v })
     });
+    if (r.status === 401) return showLogin();
     if (!r.ok) throw 0;
     $('status').textContent = '保存しました';
   } catch (e) { $('status').textContent = '保存に失敗しました'; }
 }
 
+// ---------- ログイン ----------
+let needCode = false;
+
+function showLogin() {
+  $('app').classList.add('hidden');
+  $('login').classList.remove('hidden');
+  $('code').classList.toggle('hidden', !needCode);
+  $('code').required = needCode;
+  $('pw').focus();
+}
+
+function showApp() {
+  $('login').classList.add('hidden');
+  $('app').classList.remove('hidden');
+  load();
+}
+
+$('login').onsubmit = async e => {
+  e.preventDefault();
+  $('loginErr').textContent = '';
+  const r = await fetch('/api/login', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password: $('pw').value, code: $('code').value })
+  });
+  if (r.ok) { $('pw').value = ''; $('code').value = ''; showApp(); }
+  else { $('loginErr').textContent = (await r.json().catch(() => ({}))).error || 'ログインに失敗しました'; }
+};
+
+$('logout').onclick = async () => {
+  await fetch('/api/login', { method: 'DELETE' });
+  showLogin();
+};
+
+async function start() {
+  try {
+    const s = await (await fetch('/api/login')).json();
+    needCode = s.totp;
+    s.loggedIn ? showApp() : showLogin();
+  } catch (e) { showLogin(); }
+}
+
 $('prev').onclick = () => { cur.setMonth(cur.getMonth() - 1); load(); };
 $('next').onclick = () => { cur.setMonth(cur.getMonth() + 1); load(); };
-load();
+start();
 </script>
 </body>
 </html>
