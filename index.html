@@ -52,7 +52,7 @@
     <h1 id="title"></h1>
     <button id="next">▶</button>
   </header>
-  <div class="summary">残り <b id="left">-</b> / 6 枚
+  <div class="summary">残り <b id="left">-</b> / <span id="total">-</span> 枚
     <a href="help.html" style="margin-left:12px;font-size:13px;color:#b5482e;">使い方 ›</a></div>
   <div id="list"></div>
   <div class="status" id="status"></div>
@@ -83,10 +83,10 @@ async function load() {
 
 function render() {
   $('list').innerHTML = '';
-  let left = 0;
+  let left = 0, total = 0;
   ITEMS.forEach((name, i) => {
     const v = data[i] || { used: false, date: '', memo: '' };
-    if (!v.used) left++;
+    if (v.url) { total++; if (!v.used) left++; } // URLが入っている券だけ数える
     const el = document.createElement('div');
     el.className = 'card' + (v.used ? ' used' : '');
     el.innerHTML = `
@@ -121,6 +121,7 @@ function render() {
     $('list').appendChild(el);
   });
   $('left').textContent = left;
+  $('total').textContent = total;
 }
 
 async function save(i, v) {
