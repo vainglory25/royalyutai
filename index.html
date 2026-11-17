@@ -27,6 +27,9 @@
   .links .disabled { opacity:.4; pointer-events:none; }
   .status { text-align:center; font-size:12px; color:#888; min-height:1em; }
   .hidden { display:none !important; }
+  .del { grid-column:1 / -1; justify-self:end; background:none; border:none; color:#c0392b; font-size:13px; cursor:pointer; padding:0; }
+  #add { display:block; width:100%; border:2px dashed #b5482e; background:none; color:#b5482e; border-radius:12px;
+         padding:12px; font-size:15px; cursor:pointer; margin-bottom:10px; }
   #login { background:#fff; border-radius:12px; padding:24px 20px; margin-top:40px; box-shadow:0 1px 3px rgba(0,0,0,.08);
            display:flex; flex-direction:column; gap:12px; }
   #login h2 { margin:0 0 4px; font-size:18px; text-align:center; }
@@ -55,12 +58,13 @@
   <div class="summary">残り <b id="left">-</b> / <span id="total">-</span> 枚
     <a href="help.html" style="margin-left:12px;font-size:13px;color:#b5482e;">使い方 ›</a></div>
   <div id="list"></div>
+  <button id="add">＋ 券を追加</button>
   <div class="status" id="status"></div>
   <button id="logout">ログアウト</button>
 </div>
 
 <script>
-// ★ 優待の名前はここで自由に変更できます
+// ★ 毎月の基本の券（名前は自由に変更できます）。これより後ろは「追加」で増やした券
 const ITEMS = ['優待 1', '優待 2', '優待 3', '優待 4', '優待 5', '優待 6'];
 
 let cur = new Date(); cur.setDate(1);
@@ -84,8 +88,11 @@ async function load() {
 function render() {
   $('list').innerHTML = '';
   let left = 0, total = 0;
-  ITEMS.forEach((name, i) => {
-    const v = data[i] || { used: false, date: '', memo: '' };
+  // 基本の6枚 ＋ 追加した券（保存されている番号）を番号順に並べる
+  const idx = [...new Set([...ITEMS.keys(), ...Object.keys(data).map(Number)])].sort((a, b) => a - b);
+  idx.forEach((i, pos) => {
+    const name = i < ITEMS.length ? ITEMS[i] : `優待 ${pos + 1}`; // 追加した券は続きの連番
+    const v = data[i] || { used: false, date: '', memo: '', url: '' };
     if (v.url) { total++; if (!v.used) left++; } // URLが入っている券だけ数える
     const el = document.createElement('div');
     el.className = 'card' + (v.used ? ' used' : '');
@@ -98,7 +105,8 @@ function render() {
         <button class="copy">URLをコピー</button>
         <a class="open" target="_blank" rel="noopener">開く ↗</a>
       </div>
-      <input class="memo" placeholder="メモ">`;
+      <input class="memo" placeholder="メモ">
+      ${i >= ITEMS.length ? '<button class="del">この券を削除</button>' : ''}`;
     el.querySelector('.name').textContent = name;
     const memo = el.querySelector('.memo');
     const url = el.querySelector('.url');
@@ -118,10 +126,29 @@ function render() {
       copy.textContent = 'コピーしました ✓';
       setTimeout(() => copy.textContent = 'URLをコピー', 1500);
     };
+    const del = el.querySelector('.del');
+    if (del) del.onclick = () => { if (confirm(`「${name}」を削除しますか？`)) remove(i); };
     $('list').appendChild(el);
   });
   $('left').textContent = left;
   $('total').textContent = total;
+}
+
+// 券を追加：今ある番号の次の番号で空の券を保存
+$('add').onclick = () => {
+  const max = Math.max(ITEMS.length - 1, ...Object.keys(data).map(Number));
+  save(max + 1, { used: false, date: '', memo: '', url: '' });
+};
+
+async function remove(i) {
+  delete data[i]; render();
+  $('status').textContent = '削除中…';
+  try {
+    const r = await fetch(`/api/yutai?month=${monthKey(cur)}&i=${i}`, { method: 'DELETE' });
+    if (r.status === 401) return showLogin();
+    if (!r.ok) throw 0;
+    $('status').textContent = '削除しました';
+  } catch (e) { $('status').textContent = '削除に失敗しました'; }
 }
 
 async function save(i, v) {
