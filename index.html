@@ -160,8 +160,15 @@ $('login').onsubmit = async e => {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ password: $('pw').value, code: $('code').value })
   });
-  if (r.ok) { $('pw').value = ''; $('code').value = ''; showApp(); }
-  else { $('loginErr').textContent = (await r.json().catch(() => ({}))).error || 'ログインに失敗しました'; }
+  if (r.ok) {
+    // ログインできたか（Cookieが保存されたか）を確認
+    const s = await (await fetch('/api/login')).json();
+    if (!s.loggedIn) { $('loginErr').textContent = 'パスワードは合っていますが、ログイン状態を保存できませんでした（Cookie）'; return; }
+    $('pw').value = ''; $('code').value = ''; showApp();
+  } else {
+    const j = await r.json().catch(() => ({}));
+    $('loginErr').textContent = `${j.error || 'サーバーでエラーが発生しました'}（${r.status}）`;
+  }
 };
 
 $('logout').onclick = async () => {
